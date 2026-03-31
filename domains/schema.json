@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "is-a.net Domain Definition",
+  "description": "Schema for is-a.net subdomain registration",
+  "type": "object",
+  "required": ["owner", "records"],
+  "additionalProperties": false,
+  "properties": {
+    "owner": {
+      "type": "object",
+      "required": ["username", "email"],
+      "additionalProperties": false,
+      "properties": {
+        "username": {
+          "type": "string",
+          "description": "GitHub username",
+          "pattern": "^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Contact email address"
+        }
+      }
+    },
+    "records": {
+      "type": "object",
+      "description": "DNS records to configure",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "maxProperties": 1,
+      "properties": {
+        "A": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^((25[0-5]|(2[0-4]|1\\d|[1-9]|)\\d)\\.?\\b){4}$"
+          },
+          "minItems": 1,
+          "description": "IPv4 addresses"
+        },
+        "AAAA": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "description": "IPv6 addresses"
+        },
+        "CNAME": {
+          "type": "string",
+          "description": "CNAME target hostname",
+          "pattern": "^([a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,}$"
+        }
+      }
+    }
+  }
+}

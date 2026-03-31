@@ -1,0 +1,11 @@
+{
+  "name": "is-a-net",
+  "version": "1.0.0",
+  "description": "Free subdomains for developers — *.is-a.net",
+  "private": true,
+  "scripts": {
+    "validate": "node scripts/validate.js",
+    "deploy": "node scripts/deploy.js"
+  },
+  "dependencies": {}
+}

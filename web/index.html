@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<!-- saved from url=(0062)file:///C:/Users/tatsu/Desktop/scripts/is-a.net/web/index.html -->
+<html lang="ja"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>is-a.net — Free Subdomains for Developers</title>
+  <meta name="description" content="開発者のための無料サブドメインサービス。GitHub PR を送るだけで *.is-a.net を取得できます。">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #12121a;
+      --border: #1e1e2e;
+      --text: #e4e4ef;
+      --text-dim: #8888a0;
+      --accent: #6c63ff;
+      --accent-glow: rgba(108,99,255,.15);
+      --green: #34d399;
+      --red: #f87171;
+      --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --mono: "JetBrains Mono", "Fira Code", "SF Mono", monospace;
+    }
+
+    html { scroll-behavior: smooth }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* ---- NAV ---- */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1rem 2rem;
+      background: rgba(10,10,15,.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    nav .logo { font-size: 1.25rem; font-weight: 700; letter-spacing: -.02em }
+    nav .logo span { color: var(--accent) }
+    nav a { color: var(--text-dim); text-decoration: none; font-size: .9rem; transition: color .2s }
+    nav a:hover { color: var(--text) }
+    nav .links { display: flex; gap: 1.5rem; align-items: center }
+
+    /* ---- HERO ---- */
+    .hero {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center;
+      padding: 10rem 2rem 6rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: "";
+      position: absolute; top: -40%; left: 50%; transform: translateX(-50%);
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero h1 {
+      font-size: clamp(2.5rem, 6vw, 4.5rem);
+      font-weight: 800;
+      letter-spacing: -.03em;
+      line-height: 1.1;
+      margin-bottom: 1.5rem;
+    }
+    .hero h1 span { color: var(--accent) }
+    .hero p {
+      font-size: 1.15rem;
+      color: var(--text-dim);
+      max-width: 520px;
+      margin-bottom: 2.5rem;
+    }
+
+    /* ---- DEMO INPUT ---- */
+    .demo-box {
+      display: flex; align-items: center; gap: 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 4px;
+      width: min(100%, 480px);
+      margin-bottom: 1rem;
+    }
+    .demo-box input {
+      flex: 1;
+      background: transparent; border: none; outline: none;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 1rem;
+      padding: .75rem 1rem;
+    }
+    .demo-box input::placeholder { color: var(--text-dim) }
+    .demo-box .suffix {
+      color: var(--text-dim);
+      font-family: var(--mono);
+      font-size: 1rem;
+      padding-right: .5rem;
+      white-space: nowrap;
+    }
+    .demo-box button {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: .75rem 1.25rem;
+      font-weight: 600;
+      font-size: .9rem;
+      cursor: pointer;
+      transition: opacity .2s;
+      white-space: nowrap;
+    }
+    .demo-box button:hover { opacity: .85 }
+
+    .demo-result {
+      font-family: var(--mono);
+      font-size: .9rem;
+      color: var(--text-dim);
+      height: 1.4em;
+      transition: color .3s;
+    }
+    .demo-result.valid { color: var(--green) }
+    .demo-result.invalid { color: var(--red) }
+
+    /* ---- SECTIONS ---- */
+    section {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 5rem 2rem;
+    }
+    section h2 {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 2.5rem;
+      letter-spacing: -.02em;
+    }
+
+    /* ---- STEPS ---- */
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1.5rem;
+    }
+    .step {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+      position: relative;
+    }
+    .step-num {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      background: var(--accent-glow);
+      color: var(--accent);
+      font-weight: 700;
+      font-size: .85rem;
+      margin-bottom: 1rem;
+    }
+    .step h3 { font-size: 1.1rem; margin-bottom: .5rem }
+    .step p { color: var(--text-dim); font-size: .95rem }
+
+    /* ---- CODE BLOCK ---- */
+    .code-section { margin-top: -2rem }
+    pre {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem 2rem;
+      overflow-x: auto;
+      font-family: var(--mono);
+      font-size: .85rem;
+      line-height: 1.7;
+      color: var(--text-dim);
+    }
+    pre .key { color: #c4a7e7 }
+    pre .str { color: #9ccfd8 }
+    pre .punct { color: #555570 }
+
+    /* ---- RULES ---- */
+    .rules-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+    }
+    .rule {
+      display: flex; align-items: flex-start; gap: .75rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+    }
+    .rule-icon {
+      flex-shrink: 0;
+      width: 24px; height: 24px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .85rem;
+      margin-top: 2px;
+    }
+    .rule p { font-size: .9rem; color: var(--text-dim) }
+    .rule strong { color: var(--text); font-weight: 600 }
+
+    /* ---- INVALID NAMES TABLE ---- */
+    .invalid-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+    .invalid-table th,
+    .invalid-table td {
+      text-align: left;
+      padding: .75rem 1rem;
+      font-size: .9rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .invalid-table th {
+      color: var(--text-dim);
+      font-weight: 500;
+      font-size: .8rem;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+    .invalid-table code {
+      font-family: var(--mono);
+      font-size: .85rem;
+      background: rgba(255,255,255,.04);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .invalid-table .x { color: var(--red) }
+    .invalid-table .reason { color: var(--text-dim) }
+
+    /* ---- FOOTER ---- */
+    footer {
+      text-align: center;
+      padding: 3rem 2rem;
+      color: var(--text-dim);
+      font-size: .85rem;
+      border-top: 1px solid var(--border);
+    }
+    footer a { color: var(--accent); text-decoration: none }
+
+    /* ---- RESPONSIVE ---- */
+    @media (max-width: 640px) {
+      nav { padding: .75rem 1rem }
+      .hero { padding: 8rem 1.5rem 4rem }
+      section { padding: 3rem 1.5rem }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="logo"><span>is-a</span>.net</div>
+  <div class="links">
+    <a href="file:///C:/Users/tatsu/Desktop/scripts/is-a.net/web/index.html#how">使い方</a>
+    <a href="file:///C:/Users/tatsu/Desktop/scripts/is-a.net/web/index.html#rules">ルール</a>
+    <a href="https://github.com/is-a-net/register" target="_blank">GitHub</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <h1>あなただけの<br><span>.is-a.net</span> を</h1>
+  <p>開発者のための無料サブドメインサービス。<br>GitHub に PR を送るだけで取得できます。</p>
+  <div class="demo-box">
+    <input type="text" id="subdomain" placeholder="your-name" maxlength="63" autocomplete="off" spellcheck="false">
+    <span class="suffix">.is-a.net</span>
+    <button onclick="window.open(&#39;https://github.com/is-a-net/register&#39;,&#39;_blank&#39;)">登録する</button>
+  </div>
+  <div class="demo-result" id="result"></div>
+</div>
+
+<!-- HOW IT WORKS -->
+<section id="how">
+  <h2>使い方</h2>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <h3>フォーク</h3>
+      <p>GitHub リポジトリをフォークしてください。</p>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <h3>JSON を追加</h3>
+      <p><code>domains/your-name.json</code> を作成し、DNS レコードを記述します。</p>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <h3>PR を送信</h3>
+      <p>Pull Request を作成すると自動バリデーションが走り、マージ後に DNS が反映されます。</p>
+    </div>
+  </div>
+</section>
+
+<!-- CODE EXAMPLE -->
+<section class="code-section">
+  <h2>ドメイン定義ファイル</h2>
+  <pre><span class="punct">{</span>
+  <span class="key">"owner"</span><span class="punct">:</span> <span class="punct">{</span>
+    <span class="key">"username"</span><span class="punct">:</span> <span class="str">"your-github-name"</span><span class="punct">,</span>
+    <span class="key">"email"</span><span class="punct">:</span> <span class="str">"you@example.com"</span>
+  <span class="punct">},</span>
+  <span class="key">"records"</span><span class="punct">:</span> <span class="punct">{</span>
+    <span class="key">"CNAME"</span><span class="punct">:</span> <span class="str">"your-name.github.io"</span>
+  <span class="punct">}</span>
+<span class="punct">}</span></pre>
+</section>
+
+<!-- RULES -->
+<section id="rules">
+  <h2>ルール</h2>
+  <div class="rules-grid">
+    <div class="rule">
+      <div class="rule-icon">1</div>
+      <p><strong>1人1サブドメイン</strong><br>GitHub アカウントにつき1つまで登録可能</p>
+    </div>
+    <div class="rule">
+      <div class="rule-icon">a-z</div>
+      <p><strong>英小文字・数字・ハイフン</strong><br>2〜63文字。先頭/末尾・連続ハイフン不可</p>
+    </div>
+    <div class="rule">
+      <div class="rule-icon">=</div>
+      <p><strong>PR 送信者 = owner</strong><br>他人名義の登録は自動で拒否されます</p>
+    </div>
+    
+  </div>
+
+  <h2 style="margin-top:3rem">無効なファイル名の例</h2>
+  <table class="invalid-table">
+    <thead>
+      <tr><th>ファイル名</th><th>理由</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code class="x">My-Site.json</code></td><td class="reason">大文字を含んでいる</td></tr>
+      <tr><td><code class="x">my_site.json</code></td><td class="reason">アンダースコアは使用不可（ハイフンを使う）</td></tr>
+      <tr><td><code class="x">-mysite.json</code></td><td class="reason">先頭がハイフン</td></tr>
+      <tr><td><code class="x">mysite-.json</code></td><td class="reason">末尾がハイフン</td></tr>
+      <tr><td><code class="x">my--site.json</code></td><td class="reason">連続ハイフン</td></tr>
+      <tr><td><code class="x">my.site.json</code></td><td class="reason">サブサブドメインは未対応</td></tr>
+      <tr><td><code class="x">12345.json</code></td><td class="reason">数字のみ</td></tr>
+      <tr><td><code class="x">a.json</code></td><td class="reason">短すぎる（2文字以上必要）</td></tr>
+      <tr><td><code class="x">www.json</code></td><td class="reason">システム予約済み</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<footer>
+  <p>is-a.net — <a href="https://github.com/is-a-net/register" target="_blank">GitHub</a> / MIT License</p>
+</footer>
+
+<script>
+const RESERVED = new Set([
+  "www","mail","email","webmail","smtp","imap","pop","pop3","ftp","sftp","ssh",
+  "ns","ns1","ns2","ns3","ns4","dns","dns1","dns2",
+  "api","api1","api2","graphql","rest","admin","dashboard","panel","cpanel","whm",
+  "status","health","monitor","uptime",
+  "cdn","assets","static","media","img","images","js","css","fonts","files",
+  "download","downloads","upload","uploads",
+  "blog","docs","doc","wiki","help","support","forum","community",
+  "app","web","portal","home","landing","about","news","store","shop",
+  "auth","oauth","login","signin","signup","register","account","accounts","profile","user","users","my",
+  "schema","test","testing","dev","development","staging","stage","prod","production",
+  "demo","sandbox","preview","beta","alpha","canary","internal","private","local","localhost",
+  "root","administrator","moderator","mod","owner","system","sysadmin","security",
+  "abuse","postmaster","hostmaster","webmaster","info","noreply","no-reply","null","undefined","example",
+  "is-a","isa","tatsu","this"
+]);
+
+const input = document.getElementById("subdomain");
+const result = document.getElementById("result");
+
+input.addEventListener("input", () => {
+  const v = input.value.trim();
+  if (!v) { result.textContent = ""; result.className = "demo-result"; return }
+
+  const errors = validate(v);
+  if (errors.length === 0) {
+    result.textContent = `✓ ${v}.is-a.net は利用可能です`;
+    result.className = "demo-result valid";
+  } else {
+    result.textContent = `✗ ${errors[0]}`;
+    result.className = "demo-result invalid";
+  }
+});
+
+function validate(name) {
+  const e = [];
+  if (/[A-Z]/.test(name)) e.push("大文字は使えません");
+  if (/_/.test(name)) e.push("アンダースコアは使えません（ハイフンを使ってください）");
+  if (/\s/.test(name)) e.push("スペースは使えません");
+  if (/\./.test(name)) e.push("ドットは使えません");
+  if (!/^[a-z0-9-]*$/.test(name)) e.push("使用できない文字が含まれています");
+  if (/^-/.test(name)) e.push("先頭をハイフンにできません");
+  if (/-$/.test(name)) e.push("末尾をハイフンにできません");
+  if (/--/.test(name)) e.push("連続ハイフンは使えません");
+  if (name.length < 2) e.push("2文字以上にしてください");
+  if (name.length > 63) e.push("63文字以内にしてください");
+  if (/^\d+$/.test(name)) e.push("数字のみの名前は使えません");
+  if (RESERVED.has(name)) e.push("この名前はシステム予約済みです");
+  return e;
+}
+</script>
+
+</body>
+</html>

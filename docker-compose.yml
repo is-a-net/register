@@ -1,0 +1,12 @@
+services:
+  web:
+    build: .
+    container_name: is-a-net
+    ports:
+      - "80:80"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
