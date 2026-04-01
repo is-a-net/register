@@ -606,7 +606,7 @@ async function searchDomain() {
     });
 
     if (found) {
-      const owner = (typeof found === "object" && found.owner) ? found.owner : null;
+      const owner = (typeof found === "object" && found.owner?.username) ? found.owner.username : null;
       const detail = owner
         ? `オーナー: <strong>${escapeHtml(owner)}</strong>`
         : `<a href="https://github.com/is-a-net/register/blob/main/domains/${encodeURIComponent(name)}.json" target="_blank">GitHub で詳細を確認 →</a>`;
