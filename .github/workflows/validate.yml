@@ -3,8 +3,6 @@ name: Validate PR
 on:
   pull_request_target:
     branches: [main]
-    paths:
-      - "domains/**"
 
 jobs:
   validate:
