@@ -5,7 +5,11 @@
   "private": true,
   "scripts": {
     "validate": "node scripts/validate.js",
-    "deploy": "node scripts/deploy.js"
+    "deploy": "node scripts/deploy.js",
+    "test": "jest --verbose --passWithNoTests",
+    "generate-api": "node scripts/generate-api.js"
   },
-  "dependencies": {}
+  "devDependencies": {
+    "jest": "^30.3.0"
+  }
 }

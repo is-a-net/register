@@ -127,6 +127,81 @@
     .demo-result.valid { color: var(--green) }
     .demo-result.invalid { color: var(--red) }
 
+    /* ---- SEARCH RESULT CARD ---- */
+    .search-result {
+      width: min(100%, 480px);
+      margin-top: 1rem;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity .4s ease, transform .4s ease;
+    }
+    .search-result.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .search-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      text-align: left;
+    }
+    .search-card.available { border-color: var(--green) }
+    .search-card.taken { border-color: var(--red) }
+    .search-card.error { border-color: #f59e0b }
+    .search-card .status-icon {
+      font-size: 1.3rem;
+      margin-right: .5rem;
+      vertical-align: middle;
+    }
+    .search-card .status-text {
+      font-weight: 600;
+      font-size: 1rem;
+      vertical-align: middle;
+    }
+    .search-card.available .status-text { color: var(--green) }
+    .search-card.taken .status-text { color: var(--red) }
+    .search-card.error .status-text { color: #f59e0b }
+    .search-card .status-detail {
+      margin-top: .5rem;
+      font-size: .85rem;
+      color: var(--text-dim);
+    }
+    .search-card .status-detail a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .search-card .status-detail a:hover { text-decoration: underline }
+
+    /* Loading spinner */
+    .search-loading {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: .5rem;
+      margin-top: 1rem;
+      color: var(--text-dim);
+      font-size: .9rem;
+    }
+    .search-loading.active { display: flex }
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg) } }
+
+    .demo-box button.search-btn {
+      background: var(--accent);
+      min-width: 64px;
+    }
+    .demo-box button.search-btn:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+    }
+
     /* ---- SECTIONS ---- */
     section {
       max-width: 960px;
@@ -236,6 +311,56 @@
     .invalid-table .x { color: var(--red) }
     .invalid-table .reason { color: var(--text-dim) }
 
+    /* ---- RECORD TYPES ---- */
+    .record-types {
+      display: flex; flex-wrap: wrap; gap: .5rem;
+      margin-bottom: 2rem;
+    }
+    .record-tag {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: .8rem;
+      font-weight: 600;
+      padding: .35rem .75rem;
+      border-radius: 6px;
+      background: var(--accent-glow);
+      color: var(--accent);
+      border: 1px solid rgba(108,99,255,.25);
+    }
+    .record-tag.highlight {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+    .code-note {
+      margin-top: 1.5rem;
+      padding: 1.25rem 1.5rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: .9rem;
+      color: var(--text-dim);
+    }
+    .code-note strong { color: var(--text) }
+    .code-note code {
+      font-family: var(--mono);
+      font-size: .85rem;
+      background: rgba(255,255,255,.04);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .code-examples { margin-top: 1rem }
+    .code-examples pre {
+      margin-top: .75rem;
+      font-size: .8rem;
+    }
+    .code-examples h4 {
+      font-size: .85rem;
+      color: var(--text-dim);
+      font-weight: 500;
+      margin-top: 1rem;
+    }
+
     /* ---- FOOTER ---- */
     footer {
       text-align: center;
@@ -259,8 +384,8 @@
 <nav>
   <div class="logo"><span>is-a</span>.net</div>
   <div class="links">
-    <a href="file:///C:/Users/tatsu/Desktop/scripts/is-a.net/web/index.html#how">使い方</a>
-    <a href="file:///C:/Users/tatsu/Desktop/scripts/is-a.net/web/index.html#rules">ルール</a>
+    <a href="#how">使い方</a>
+    <a href="#rules">ルール</a>
     <a href="https://github.com/is-a-net/register" target="_blank">GitHub</a>
   </div>
 </nav>
@@ -272,9 +397,14 @@
   <div class="demo-box">
     <input type="text" id="subdomain" placeholder="your-name" maxlength="63" autocomplete="off" spellcheck="false">
     <span class="suffix">.is-a.net</span>
-    <button onclick="window.open(&#39;https://github.com/is-a-net/register&#39;,&#39;_blank&#39;)">登録する</button>
+    <button class="search-btn" id="searchBtn" onclick="searchDomain()">検索</button>
   </div>
   <div class="demo-result" id="result"></div>
+  <div class="search-loading" id="searchLoading">
+    <div class="spinner"></div>
+    <span>確認中…</span>
+  </div>
+  <div class="search-result" id="searchResult"></div>
 </div>
 
 <!-- HOW IT WORKS -->
@@ -299,6 +429,29 @@
   </div>
 </section>
 
+<!-- SUPPORTED RECORD TYPES -->
+<section>
+  <h2>対応レコードタイプ</h2>
+  <p style="color:var(--text-dim);margin-bottom:1.5rem">11 種類の DNS レコードに対応しています。</p>
+  <div class="record-types">
+    <span class="record-tag highlight">A</span>
+    <span class="record-tag highlight">AAAA</span>
+    <span class="record-tag highlight">CNAME</span>
+    <span class="record-tag">MX</span>
+    <span class="record-tag">TXT</span>
+    <span class="record-tag">NS</span>
+    <span class="record-tag">CAA</span>
+    <span class="record-tag">DS</span>
+    <span class="record-tag">SRV</span>
+    <span class="record-tag">TLSA</span>
+    <span class="record-tag">URL</span>
+  </div>
+  <div class="code-note">
+    <strong>🛡️ Cloudflare プロキシ</strong><br>
+    A, AAAA, CNAME では <code>"proxied": true</code> を指定すると Cloudflare プロキシ（CDN・DDoS 保護・SSL）を有効化できます。
+  </div>
+</section>
+
 <!-- CODE EXAMPLE -->
 <section class="code-section">
   <h2>ドメイン定義ファイル</h2>
@@ -311,6 +464,16 @@
     <span class="key">"CNAME"</span><span class="punct">:</span> <span class="str">"your-name.github.io"</span>
   <span class="punct">}</span>
 <span class="punct">}</span></pre>
+
+  <div class="code-note">
+    <strong>💡 よく使われるレコード例</strong>
+    <div class="code-examples">
+      <h4>▸ メールサーバー（MX）</h4>
+      <pre><span class="key">"records"</span><span class="punct">:</span> <span class="punct">{</span> <span class="key">"MX"</span><span class="punct">:</span> <span class="punct">[{</span> <span class="key">"priority"</span><span class="punct">:</span> 10<span class="punct">,</span> <span class="key">"value"</span><span class="punct">:</span> <span class="str">"mail.example.com"</span> <span class="punct">}]</span> <span class="punct">}</span></pre>
+      <h4>▸ SPF / 検証用（TXT）</h4>
+      <pre><span class="key">"records"</span><span class="punct">:</span> <span class="punct">{</span> <span class="key">"TXT"</span><span class="punct">:</span> <span class="punct">[</span><span class="str">"v=spf1 include:_spf.google.com ~all"</span><span class="punct">]</span> <span class="punct">}</span></pre>
+    </div>
+  </div>
 </section>
 
 <!-- RULES -->
@@ -328,6 +491,14 @@
     <div class="rule">
       <div class="rule-icon">=</div>
       <p><strong>PR 送信者 = owner</strong><br>他人名義の登録は自動で拒否されます</p>
+    </div>
+    <div class="rule">
+      <div class="rule-icon">📋</div>
+      <p><strong>レコードタイプは基本1種類</strong><br>1つのドメインに設定できるレコードタイプは原則1種類です。ただし NS + DS の組み合わせは許可されます。</p>
+    </div>
+    <div class="rule">
+      <div class="rule-icon">⚠</div>
+      <p><strong>CNAME と A/AAAA は併用不可</strong><br>CNAME を使用する場合、A や AAAA レコードは同時に設定できません。</p>
     </div>
     
   </div>
@@ -356,6 +527,11 @@
 </footer>
 
 <script>
+const ALLOWED_RECORD_TYPES = ["A","AAAA","CNAME","MX","TXT","NS","CAA","DS","SRV","TLSA","URL"];
+
+// API endpoint - update this when gh-pages is configured
+const API_BASE = 'https://is-a-net.github.io/register';
+
 const RESERVED = new Set([
   "www","mail","email","webmail","smtp","imap","pop","pop3","ftp","sftp","ssh",
   "ns","ns1","ns2","ns3","ns4","dns","dns1","dns2",
@@ -375,20 +551,98 @@ const RESERVED = new Set([
 
 const input = document.getElementById("subdomain");
 const result = document.getElementById("result");
+const searchResult = document.getElementById("searchResult");
+const searchLoading = document.getElementById("searchLoading");
+const searchBtn = document.getElementById("searchBtn");
+
+let domainsCache = null;
 
 input.addEventListener("input", () => {
   const v = input.value.trim();
+  searchResult.classList.remove("visible");
+  searchResult.innerHTML = "";
   if (!v) { result.textContent = ""; result.className = "demo-result"; return }
 
   const errors = validate(v);
   if (errors.length === 0) {
-    result.textContent = `✓ ${v}.is-a.net は利用可能です`;
+    result.textContent = `✓ ${v}.is-a.net は形式的に有効です`;
     result.className = "demo-result valid";
   } else {
     result.textContent = `✗ ${errors[0]}`;
     result.className = "demo-result invalid";
   }
 });
+
+input.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") searchDomain();
+});
+
+async function searchDomain() {
+  const name = input.value.trim();
+  if (!name) return;
+
+  const errors = validate(name);
+  if (errors.length > 0) {
+    showResult("error", "⚠️", errors[0], null);
+    return;
+  }
+
+  searchBtn.disabled = true;
+  searchLoading.classList.add("active");
+  searchResult.classList.remove("visible");
+
+  try {
+    if (!domainsCache) {
+      const res = await fetch(`${API_BASE}/domains.json`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      domainsCache = data.domains || data;
+    }
+
+    const domains = Array.isArray(domainsCache) ? domainsCache : [];
+    const found = domains.find(d => {
+      const dName = typeof d === "string" ? d : (d.name || d.domain || "");
+      return dName.toLowerCase() === name.toLowerCase();
+    });
+
+    if (found) {
+      const owner = (typeof found === "object" && found.owner) ? found.owner : null;
+      const detail = owner
+        ? `オーナー: <strong>${escapeHtml(owner)}</strong>`
+        : `<a href="https://github.com/is-a-net/register/blob/main/domains/${encodeURIComponent(name)}.json" target="_blank">GitHub で詳細を確認 →</a>`;
+      showResult("taken", "❌", "使用中です", detail);
+    } else {
+      showResult("available", "✅", "利用可能です！",
+        `<a href="https://github.com/is-a-net/register" target="_blank">今すぐ登録する →</a>`);
+    }
+  } catch (err) {
+    domainsCache = null;
+    showResult("error", "⚠️",
+      "ドメインの空き状況を確認できませんでした",
+      '直接 <a href="https://github.com/is-a-net/register" target="_blank">GitHub</a> で確認してください。');
+  } finally {
+    searchBtn.disabled = false;
+    searchLoading.classList.remove("active");
+  }
+}
+
+function showResult(type, icon, text, detail) {
+  searchResult.innerHTML = `
+    <div class="search-card ${type}">
+      <div>
+        <span class="status-icon">${icon}</span>
+        <span class="status-text">${escapeHtml(text)}</span>
+      </div>
+      ${detail ? `<div class="status-detail">${detail}</div>` : ""}
+    </div>`;
+  requestAnimationFrame(() => searchResult.classList.add("visible"));
+}
+
+function escapeHtml(str) {
+  const d = document.createElement("div");
+  d.textContent = str;
+  return d.innerHTML;
+}
 
 function validate(name) {
   const e = [];

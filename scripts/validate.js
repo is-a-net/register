@@ -158,8 +158,9 @@ const HOSTNAME_PATTERN =
 const GITHUB_USERNAME_PATTERN =
   /^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const URL_PATTERN = /^https?:\/\/.+/;
 
-const ALLOWED_RECORD_TYPES = ["A", "AAAA", "CNAME"];
+const ALLOWED_RECORD_TYPES = ["A", "AAAA", "CNAME", "MX", "TXT", "NS", "CAA", "DS", "SRV", "TLSA", "URL"];
 
 // Blocked CNAME targets (abuse prevention)
 const BLOCKED_CNAME_PATTERNS = [
@@ -348,7 +349,7 @@ function validateDomainData(data) {
     return errors;
   }
 
-  const allowedKeys = new Set(["owner", "records"]);
+  const allowedKeys = new Set(["owner", "records", "proxied"]);
   for (const key of Object.keys(data)) {
     if (!allowedKeys.has(key)) {
       errors.push(`Unknown top-level key: "${key}"`);
@@ -372,6 +373,13 @@ function validateDomainData(data) {
     }
   }
 
+  // Validate proxied flag
+  if (data.proxied !== undefined) {
+    if (typeof data.proxied !== "boolean") {
+      errors.push("'proxied' must be a boolean (true or false)");
+    }
+  }
+
   // Validate records
   if (!data.records || typeof data.records !== "object") {
     errors.push("Missing or invalid 'records' field");
@@ -383,8 +391,44 @@ function validateDomainData(data) {
     errors.push("'records' must contain at least one record type");
     return errors;
   }
-  if (recordKeys.length > 1) {
-    errors.push("'records' must contain exactly one record type");
+  // Record combination rules
+  const hasA = 'A' in data.records;
+  const hasAAAA = 'AAAA' in data.records;
+  const hasCNAME = 'CNAME' in data.records;
+  const hasNS = 'NS' in data.records;
+  const hasDS = 'DS' in data.records;
+  const hasURL = 'URL' in data.records;
+
+  // CNAME cannot coexist with any other record type (RFC 1034)
+  if (hasCNAME && recordKeys.length > 1) {
+    errors.push("CNAME records cannot be combined with any other record types");
+  }
+
+  // NS can only combine with DS
+  if (hasNS) {
+    const otherKeys = recordKeys.filter(k => k !== 'NS' && k !== 'DS');
+    if (otherKeys.length > 0) {
+      errors.push("NS records can only be combined with DS records");
+    }
+  }
+
+  // DS requires NS
+  if (hasDS && !hasNS) {
+    errors.push("DS records require NS records to be present");
+  }
+
+  // URL cannot combine with A/AAAA/CNAME
+  if (hasURL && (hasA || hasAAAA || hasCNAME)) {
+    errors.push("URL records cannot be combined with A, AAAA, or CNAME records");
+  }
+
+  // Proxied flag can only be used with A, AAAA, or CNAME records
+  if (data.proxied === true) {
+    const proxyableTypes = ["A", "AAAA", "CNAME"];
+    const hasProxyable = recordKeys.some(k => proxyableTypes.includes(k));
+    if (!hasProxyable) {
+      errors.push("'proxied' can only be used with A, AAAA, or CNAME records");
+    }
   }
 
   for (const key of recordKeys) {
@@ -450,6 +494,163 @@ function validateDomainData(data) {
             );
           }
         }
+      }
+    }
+
+    if (key === "MX") {
+      if (!Array.isArray(value) || value.length === 0) {
+        errors.push("'MX' records must be a non-empty array");
+      } else {
+        for (const entry of value) {
+          if (typeof entry === "string") {
+            if (!HOSTNAME_PATTERN.test(entry)) {
+              errors.push(`Invalid MX target: "${entry}". Must be a valid hostname.`);
+            }
+          } else if (typeof entry === "object" && entry !== null) {
+            if (!entry.target || !HOSTNAME_PATTERN.test(entry.target)) {
+              errors.push(`Invalid MX target: "${entry.target}". Must be a valid hostname.`);
+            }
+            if (entry.priority !== undefined && (!Number.isInteger(entry.priority) || entry.priority < 0 || entry.priority > 65535)) {
+              errors.push(`Invalid MX priority: ${entry.priority}. Must be an integer 0-65535.`);
+            }
+          } else {
+            errors.push(`Invalid MX entry: must be a string or object with {target, priority}`);
+          }
+        }
+      }
+    }
+
+    if (key === "TXT") {
+      if (typeof value === "string") {
+        // Single string TXT is OK
+      } else if (Array.isArray(value)) {
+        if (value.length === 0) {
+          errors.push("'TXT' records array must not be empty");
+        }
+        for (const entry of value) {
+          if (typeof entry !== "string") {
+            errors.push(`Invalid TXT entry: must be a string, got ${typeof entry}`);
+          }
+        }
+      } else {
+        errors.push("'TXT' records must be a string or array of strings");
+      }
+    }
+
+    if (key === "NS") {
+      if (!Array.isArray(value) || value.length === 0) {
+        errors.push("'NS' records must be a non-empty array of hostnames");
+      } else {
+        for (const ns of value) {
+          if (typeof ns !== "string" || !HOSTNAME_PATTERN.test(ns)) {
+            errors.push(`Invalid NS target: "${ns}". Must be a valid hostname.`);
+          }
+        }
+      }
+    }
+
+    if (key === "CAA") {
+      if (!Array.isArray(value) || value.length === 0) {
+        errors.push("'CAA' records must be a non-empty array");
+      } else {
+        const VALID_CAA_TAGS = ["issue", "issuewild", "iodef"];
+        for (const entry of value) {
+          if (typeof entry !== "object" || entry === null) {
+            errors.push("Each CAA record must be an object with {tag, value}");
+            continue;
+          }
+          if (!entry.tag || !VALID_CAA_TAGS.includes(entry.tag)) {
+            errors.push(`Invalid CAA tag: "${entry.tag}". Must be one of: ${VALID_CAA_TAGS.join(", ")}`);
+          }
+          if (!entry.value || typeof entry.value !== "string") {
+            errors.push("CAA record must have a 'value' string");
+          }
+        }
+      }
+    }
+
+    if (key === "DS") {
+      if (!Array.isArray(value) || value.length === 0) {
+        errors.push("'DS' records must be a non-empty array");
+      } else {
+        for (const entry of value) {
+          if (typeof entry !== "object" || entry === null) {
+            errors.push("Each DS record must be an object with {key_tag, algorithm, digest_type, digest}");
+            continue;
+          }
+          if (!Number.isInteger(entry.key_tag) || entry.key_tag < 0 || entry.key_tag > 65535) {
+            errors.push(`Invalid DS key_tag: ${entry.key_tag}. Must be integer 0-65535.`);
+          }
+          if (!Number.isInteger(entry.algorithm) || entry.algorithm < 0 || entry.algorithm > 255) {
+            errors.push(`Invalid DS algorithm: ${entry.algorithm}. Must be integer 0-255.`);
+          }
+          if (!Number.isInteger(entry.digest_type) || entry.digest_type < 0 || entry.digest_type > 255) {
+            errors.push(`Invalid DS digest_type: ${entry.digest_type}. Must be integer 0-255.`);
+          }
+          if (!entry.digest || typeof entry.digest !== "string") {
+            errors.push("DS record must have a 'digest' string");
+          }
+        }
+      }
+    }
+
+    if (key === "SRV") {
+      if (!Array.isArray(value) || value.length === 0) {
+        errors.push("'SRV' records must be a non-empty array");
+      } else {
+        for (const entry of value) {
+          if (typeof entry !== "object" || entry === null) {
+            errors.push("Each SRV record must be an object with {priority, weight, port, target}");
+            continue;
+          }
+          if (!Number.isInteger(entry.priority) || entry.priority < 0 || entry.priority > 65535) {
+            errors.push(`Invalid SRV priority: ${entry.priority}. Must be integer 0-65535.`);
+          }
+          if (!Number.isInteger(entry.weight) || entry.weight < 0 || entry.weight > 65535) {
+            errors.push(`Invalid SRV weight: ${entry.weight}. Must be integer 0-65535.`);
+          }
+          if (!Number.isInteger(entry.port) || entry.port < 0 || entry.port > 65535) {
+            errors.push(`Invalid SRV port: ${entry.port}. Must be integer 0-65535.`);
+          }
+          if (!entry.target || typeof entry.target !== "string" || !HOSTNAME_PATTERN.test(entry.target)) {
+            errors.push(`Invalid SRV target: "${entry.target}". Must be a valid hostname.`);
+          }
+        }
+      }
+    }
+
+    if (key === "TLSA") {
+      if (!Array.isArray(value) || value.length === 0) {
+        errors.push("'TLSA' records must be a non-empty array");
+      } else {
+        for (const entry of value) {
+          if (typeof entry !== "object" || entry === null) {
+            errors.push("Each TLSA record must be an object with {usage, selector, matching_type, certificate}");
+            continue;
+          }
+          if (!Number.isInteger(entry.usage) || entry.usage < 0 || entry.usage > 3) {
+            errors.push(`Invalid TLSA usage: ${entry.usage}. Must be integer 0-3.`);
+          }
+          if (!Number.isInteger(entry.selector) || entry.selector < 0 || entry.selector > 1) {
+            errors.push(`Invalid TLSA selector: ${entry.selector}. Must be 0 or 1.`);
+          }
+          if (!Number.isInteger(entry.matching_type) || entry.matching_type < 0 || entry.matching_type > 2) {
+            errors.push(`Invalid TLSA matching_type: ${entry.matching_type}. Must be integer 0-2.`);
+          }
+          if (!entry.certificate || typeof entry.certificate !== "string") {
+            errors.push("TLSA record must have a 'certificate' string");
+          }
+        }
+      }
+    }
+
+    if (key === "URL") {
+      if (typeof value !== "string" || !URL_PATTERN.test(value)) {
+        errors.push(`Invalid URL redirect: "${value}". Must be a valid http:// or https:// URL.`);
+      }
+      // Block self-referencing URLs
+      if (typeof value === "string" && /\.is-a\.net/i.test(value)) {
+        errors.push(`URL redirect "${value}" cannot point to is-a.net (self-referencing).`);
       }
     }
   }
@@ -566,4 +767,17 @@ function main() {
   console.log("\nAll files validated successfully.");
 }
 
-main();
+if (require.main === module) {
+  main();
+}
+
+module.exports = {
+  validateSubdomainName,
+  validateDomainData,
+  validateOwnershipLimit,
+  validatePRAuthor,
+  isPrivateIPv4,
+  RESERVED,
+  ALLOWED_RECORD_TYPES,
+  URL_PATTERN,
+};

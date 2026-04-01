@@ -1,0 +1,47 @@
+name: Stale
+
+on:
+  schedule:
+    - cron: "0 12 * * *"  # 毎日 12:00 UTC に実行
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    name: Close stale PRs and issues
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/stale@v9
+        with:
+          # PR settings
+          days-before-pr-stale: 3
+          days-before-pr-close: 5
+          stale-pr-message: |
+            ⚠️ この PR は 3 日間更新がないため、stale としてマークされました。
+            5 日以内に更新がない場合、自動的にクローズされます。
+
+            まだ作業中の場合は、コメントまたは push で更新してください。
+          close-pr-message: |
+            🔒 この PR は更新がないため自動的にクローズされました。
+            引き続き登録を希望する場合は、新しい PR を作成してください。
+          stale-pr-label: stale
+
+          # Issue settings
+          days-before-issue-stale: 7
+          days-before-issue-close: 14
+          stale-issue-message: |
+            ⚠️ この Issue は 7 日間更新がないため、stale としてマークされました。
+            14 日以内に更新がない場合、自動的にクローズされます。
+          close-issue-message: |
+            🔒 この Issue は更新がないため自動的にクローズされました。
+          stale-issue-label: stale
+
+          # Exempt labels
+          exempt-pr-labels: "no-stale,in-progress"
+          exempt-issue-labels: "no-stale,in-progress"
+
+          # Operation limits
+          operations-per-run: 30

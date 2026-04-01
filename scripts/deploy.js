@@ -44,14 +44,27 @@ async function listExistingRecords(name) {
   return data.result || [];
 }
 
-async function createRecord(name, type, content, proxied = false) {
+async function createRecord(name, type, content, proxied = false, priority = undefined) {
   console.log(`  Creating ${type} record: ${name}.${BASE_DOMAIN} -> ${content}`);
-  return cfRequest("POST", `/zones/${CF_ZONE_ID}/dns_records`, {
+  const body = {
     type,
     name: `${name}.${BASE_DOMAIN}`,
     content,
     proxied,
-    ttl: 1, // Auto TTL
+    ttl: 1,
+  };
+  if (priority !== undefined) body.priority = priority;
+  return cfRequest("POST", `/zones/${CF_ZONE_ID}/dns_records`, body);
+}
+
+async function createRecordWithData(name, type, data, proxied = false) {
+  console.log(`  Creating ${type} record: ${name}.${BASE_DOMAIN}`);
+  return cfRequest("POST", `/zones/${CF_ZONE_ID}/dns_records`, {
+    type,
+    name: `${name}.${BASE_DOMAIN}`,
+    data,
+    proxied,
+    ttl: 1,
   });
 }
 
@@ -64,6 +77,7 @@ async function deployDomain(filename) {
   const filePath = path.join(DOMAINS_DIR, filename);
   const data = JSON.parse(fs.readFileSync(filePath, "utf-8"));
   const records = data.records;
+  const proxied = data.proxied === true;
 
   console.log(`\nDeploying: ${name}.${BASE_DOMAIN}`);
 
@@ -79,18 +93,87 @@ async function deployDomain(filename) {
   // Create new records
   if (records.A) {
     for (const ip of records.A) {
-      await createRecord(name, "A", ip);
+      await createRecord(name, "A", ip, proxied);
     }
   }
 
   if (records.AAAA) {
     for (const ip of records.AAAA) {
-      await createRecord(name, "AAAA", ip);
+      await createRecord(name, "AAAA", ip, proxied);
     }
   }
 
   if (records.CNAME) {
-    await createRecord(name, "CNAME", records.CNAME);
+    await createRecord(name, "CNAME", records.CNAME, proxied);
+  }
+
+  if (records.MX) {
+    for (const entry of records.MX) {
+      const target = typeof entry === "string" ? entry : entry.target;
+      const priority = typeof entry === "object" ? (entry.priority || 10) : 10;
+      await createRecord(name, "MX", target, false, priority);
+    }
+  }
+
+  if (records.TXT) {
+    const txtEntries = Array.isArray(records.TXT) ? records.TXT : [records.TXT];
+    for (const txt of txtEntries) {
+      await createRecord(name, "TXT", txt);
+    }
+  }
+
+  if (records.NS) {
+    for (const ns of records.NS) {
+      await createRecord(name, "NS", ns);
+    }
+  }
+
+  if (records.CAA) {
+    for (const entry of records.CAA) {
+      await createRecordWithData(name, "CAA", {
+        flags: entry.flags || 0,
+        tag: entry.tag,
+        value: entry.value,
+      });
+    }
+  }
+
+  if (records.DS) {
+    for (const entry of records.DS) {
+      await createRecordWithData(name, "DS", {
+        key_tag: entry.key_tag,
+        algorithm: entry.algorithm,
+        digest_type: entry.digest_type,
+        digest: entry.digest,
+      });
+    }
+  }
+
+  if (records.SRV) {
+    for (const entry of records.SRV) {
+      await createRecordWithData(name, "SRV", {
+        priority: entry.priority,
+        weight: entry.weight,
+        port: entry.port,
+        target: entry.target,
+      });
+    }
+  }
+
+  if (records.TLSA) {
+    for (const entry of records.TLSA) {
+      await createRecordWithData(name, "TLSA", {
+        usage: entry.usage,
+        selector: entry.selector,
+        matching_type: entry.matching_type,
+        certificate: entry.certificate,
+      });
+    }
+  }
+
+  if (records.URL) {
+    await createRecord(name, "A", "192.0.2.1", true);
+    console.log(`  ⚠ URL redirect requires Cloudflare Page Rule to be configured separately`);
   }
 
   console.log(`  ✓ Deployed successfully`);

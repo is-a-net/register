@@ -23,12 +23,16 @@
         }
       }
     },
+    "proxied": {
+      "type": "boolean",
+      "description": "Enable Cloudflare proxy (only for A, AAAA, CNAME records)",
+      "default": false
+    },
     "records": {
       "type": "object",
       "description": "DNS records to configure",
       "additionalProperties": false,
       "minProperties": 1,
-      "maxProperties": 1,
       "properties": {
         "A": {
           "type": "array",
@@ -51,6 +55,100 @@
           "type": "string",
           "description": "CNAME target hostname",
           "pattern": "^([a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,}$"
+        },
+        "MX": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              { "type": "string", "description": "MX target hostname" },
+              {
+                "type": "object",
+                "required": ["target"],
+                "properties": {
+                  "target": { "type": "string", "description": "MX target hostname" },
+                  "priority": { "type": "integer", "minimum": 0, "maximum": 65535, "description": "MX priority (default: 10)" }
+                }
+              }
+            ]
+          },
+          "minItems": 1,
+          "description": "Mail exchange records"
+        },
+        "TXT": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+          ],
+          "description": "Text records"
+        },
+        "NS": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "description": "Nameserver records"
+        },
+        "CAA": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["tag", "value"],
+            "properties": {
+              "tag": { "type": "string", "enum": ["issue", "issuewild", "iodef"], "description": "CAA tag" },
+              "value": { "type": "string", "description": "CAA value" }
+            }
+          },
+          "minItems": 1,
+          "description": "Certificate Authority Authorization records"
+        },
+        "DS": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["key_tag", "algorithm", "digest_type", "digest"],
+            "properties": {
+              "key_tag": { "type": "integer", "minimum": 0, "maximum": 65535 },
+              "algorithm": { "type": "integer", "minimum": 0, "maximum": 255 },
+              "digest_type": { "type": "integer", "minimum": 0, "maximum": 255 },
+              "digest": { "type": "string" }
+            }
+          },
+          "minItems": 1,
+          "description": "DNSSEC Delegation Signer records"
+        },
+        "SRV": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["priority", "weight", "port", "target"],
+            "properties": {
+              "priority": { "type": "integer", "minimum": 0, "maximum": 65535 },
+              "weight": { "type": "integer", "minimum": 0, "maximum": 65535 },
+              "port": { "type": "integer", "minimum": 0, "maximum": 65535 },
+              "target": { "type": "string" }
+            }
+          },
+          "minItems": 1,
+          "description": "Service records"
+        },
+        "TLSA": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["usage", "selector", "matching_type", "certificate"],
+            "properties": {
+              "usage": { "type": "integer", "minimum": 0, "maximum": 3 },
+              "selector": { "type": "integer", "minimum": 0, "maximum": 1 },
+              "matching_type": { "type": "integer", "minimum": 0, "maximum": 2 },
+              "certificate": { "type": "string" }
+            }
+          },
+          "minItems": 1,
+          "description": "DANE/TLS Authentication records"
+        },
+        "URL": {
+          "type": "string",
+          "pattern": "^https?://.+",
+          "description": "HTTP/HTTPS redirect URL"
         }
       }
     }
