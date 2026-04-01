@@ -187,7 +187,6 @@ async function main() {
 
   console.log(`Found ${files.length} domain(s) to deploy.`);
 
-  // Also detect deleted domains (records in CF that no longer have a JSON file)
   const existingSubdomains = new Set(files.map((f) => path.basename(f, ".json")));
 
   for (const file of files) {
@@ -197,6 +196,43 @@ async function main() {
       console.error(`  ✗ Failed to deploy ${file}: ${e.message}`);
       process.exit(1);
     }
+  }
+
+  // Clean up DNS records for deleted domains
+  console.log("\nChecking for deleted domains...");
+  try {
+    let page = 1;
+    let allRecords = [];
+    while (true) {
+      const data = await cfRequest(
+        "GET",
+        `/zones/${CF_ZONE_ID}/dns_records?per_page=100&page=${page}`
+      );
+      allRecords = allRecords.concat(data.result || []);
+      if (data.result_info && page >= data.result_info.total_pages) break;
+      page++;
+    }
+
+    const deletedRecords = allRecords.filter((r) => {
+      const fqdn = r.name;
+      if (!fqdn.endsWith(`.${BASE_DOMAIN}`)) return false;
+      const subdomain = fqdn.replace(`.${BASE_DOMAIN}`, "");
+      // Skip root domain records and multi-level subdomains
+      if (!subdomain || subdomain.includes(".")) return false;
+      return !existingSubdomains.has(subdomain);
+    });
+
+    if (deletedRecords.length > 0) {
+      console.log(`Found ${deletedRecords.length} orphaned DNS record(s) to remove.`);
+      for (const record of deletedRecords) {
+        console.log(`  Deleting orphaned ${record.type} record: ${record.name} (${record.id})`);
+        await deleteRecord(record.id);
+      }
+    } else {
+      console.log("No orphaned DNS records found.");
+    }
+  } catch (e) {
+    console.error(`  Warning: Failed to clean up deleted domains: ${e.message}`);
   }
 
   console.log("\nDeployment complete.");
