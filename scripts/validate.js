@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const net = require("net");
 
 const DOMAINS_DIR = path.join(__dirname, "..", "domains");
 
@@ -470,11 +471,9 @@ function validateDomainData(data) {
           errors.push("'AAAA' records can have at most 4 addresses");
         }
         for (const ip of value) {
-          if (typeof ip !== "string") {
+          if (typeof ip !== "string" || net.isIP(ip) !== 6) {
             errors.push(`Invalid IPv6 address: "${ip}"`);
-          }
-          // Block loopback
-          if (ip === "::1" || ip === "::") {
+          } else if (ip === "::1" || ip === "::") {
             errors.push(`Loopback/unspecified IPv6 address not allowed: "${ip}"`);
           }
         }

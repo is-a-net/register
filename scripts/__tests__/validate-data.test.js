@@ -270,6 +270,39 @@ describe("AAAA records", () => {
     expect(errors.some((e) => e.includes("Invalid IPv6"))).toBe(true);
   });
 
+  test("invalid IPv6 format string → error", () => {
+    const data = validData();
+    data.records = { AAAA: ["not-an-ip"] };
+    const errors = validateDomainData(data);
+    expect(errors.some((e) => e.includes("Invalid IPv6"))).toBe(true);
+  });
+
+  test("invalid IPv6 format 'abc.def.ghi.jkl' → error", () => {
+    const data = validData();
+    data.records = { AAAA: ["abc.def.ghi.jkl"] };
+    const errors = validateDomainData(data);
+    expect(errors.some((e) => e.includes("Invalid IPv6"))).toBe(true);
+  });
+
+  test("IPv4 address in AAAA → error", () => {
+    const data = validData();
+    data.records = { AAAA: ["1.2.3.4"] };
+    const errors = validateDomainData(data);
+    expect(errors.some((e) => e.includes("Invalid IPv6"))).toBe(true);
+  });
+
+  test("valid IPv4-mapped IPv6 '::ffff:192.0.2.128' → no error", () => {
+    const data = validData();
+    data.records = { AAAA: ["::ffff:192.0.2.128"] };
+    expect(validateDomainData(data)).toEqual([]);
+  });
+
+  test("valid full IPv6 '2001:0db8:0000:0000:0000:0000:0000:0001' → no error", () => {
+    const data = validData();
+    data.records = { AAAA: ["2001:0db8:0000:0000:0000:0000:0000:0001"] };
+    expect(validateDomainData(data)).toEqual([]);
+  });
+
   test("valid IPv6 '2001:db8::1' → no error", () => {
     const data = validData();
     data.records = { AAAA: ["2001:db8::1"] };

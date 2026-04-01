@@ -9,6 +9,19 @@ const CF_API_TOKEN = process.env.CF_API_TOKEN;
 const CF_ZONE_ID = process.env.CF_ZONE_ID;
 const BASE_DOMAIN = "is-a.net";
 
+// Subdomains managed outside domain JSON files (infrastructure, manual Cloudflare records)
+// These are NEVER deleted by orphaned record cleanup
+const PROTECTED_SUBDOMAINS = new Set([
+  "this",    // Landing page (CNAME → is-a-net.github.io)
+  "www",     // Potential www redirect
+  "api",     // API endpoint
+  "mail",    // Mail infrastructure
+  "smtp",    // Mail infrastructure
+  "imap",    // Mail infrastructure
+  "pop",     // Mail infrastructure
+  "_dmarc",  // DMARC record
+]);
+
 if (!CF_API_TOKEN || !CF_ZONE_ID) {
   console.error("Missing required environment variables: CF_API_TOKEN, CF_ZONE_ID");
   process.exit(1);
@@ -219,6 +232,8 @@ async function main() {
       const subdomain = fqdn.replace(`.${BASE_DOMAIN}`, "");
       // Skip root domain records and multi-level subdomains
       if (!subdomain || subdomain.includes(".")) return false;
+      // Never delete protected infrastructure subdomains
+      if (PROTECTED_SUBDOMAINS.has(subdomain.toLowerCase())) return false;
       return !existingSubdomains.has(subdomain);
     });
 

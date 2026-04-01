@@ -61,6 +61,12 @@ jobs:
                 continue;
               }
 
+              // Skip PRs that also have update/delete labels (mixed changes need review)
+              if (labels.includes('update') || labels.includes('delete')) {
+                console.log(`  Skipping: has 'update' or 'delete' label (needs manual review)`);
+                continue;
+              }
+
               // Check if it has 'non-domain' label (means non-domain files changed)
               if (labels.includes('non-domain')) {
                 console.log(`  Skipping: has 'non-domain' label (needs manual review)`);
