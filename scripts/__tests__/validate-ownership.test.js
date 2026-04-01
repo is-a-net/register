@@ -42,6 +42,12 @@ describe('validateOwnershipLimit', () => {
     expect(errors.length).toBeGreaterThan(0);
     expect(errors[0]).toContain("already owns");
   });
+
+  test('does not fail when deleted file is excluded from ownership map', () => {
+    const ownershipMap = new Map([["frank", []]]);
+    const errors = validateOwnershipLimit("domains/app2.json", { owner: { username: "frank" } }, ownershipMap);
+    expect(errors).toEqual([]);
+  });
 });
 
 describe('validatePRAuthor', () => {

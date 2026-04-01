@@ -17,11 +17,11 @@ jobs:
       - uses: actions/stale@v9
         with:
           # PR settings
-          days-before-pr-stale: 3
-          days-before-pr-close: 5
+          days-before-pr-stale: 7
+          days-before-pr-close: 7
           stale-pr-message: |
-            ⚠️ この PR は 3 日間更新がないため、stale としてマークされました。
-            5 日以内に更新がない場合、自動的にクローズされます。
+            ⚠️ この PR は 7 日間更新がないため、stale としてマークされました。
+            7 日以内に更新がない場合、自動的にクローズされます。
 
             まだ作業中の場合は、コメントまたは push で更新してください。
           close-pr-message: |

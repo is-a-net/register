@@ -197,26 +197,42 @@ function getAllDomainFiles() {
     .filter((f) => f.endsWith(".json") && f !== "schema.json");
 }
 
+function parseEnvFiles(value) {
+  if (!value) {
+    return [];
+  }
+
+  return value
+    .split('\n')
+    .map((f) => f.trim())
+    .filter(Boolean)
+    .filter((f) => f.startsWith("domains/") && f.endsWith(".json"))
+    .filter((f) => !f.endsWith("schema.json"));
+}
+
 function getChangedFiles() {
-  const changedFiles = process.env.CHANGED_FILES;
-  if (changedFiles) {
-    return changedFiles
-      .split("\n")
-      .map((f) => f.trim())
-      .filter((f) => f.startsWith("domains/") && f.endsWith(".json"))
-      .filter((f) => !f.endsWith("schema.json"));
+  if (process.env.CHANGED_FILES !== undefined) {
+    return parseEnvFiles(process.env.CHANGED_FILES);
   }
   return getAllDomainFiles().map((f) => path.join("domains", f));
+}
+
+function getDeletedFiles() {
+  return parseEnvFiles(process.env.DELETED_FILES);
 }
 
 // ============================================================
 // Build ownership map: username -> list of subdomain files
 // ============================================================
-function buildOwnershipMap() {
+function buildOwnershipMap(excludedFiles = new Set()) {
   const map = new Map(); // username -> [filename, ...]
   const allFiles = getAllDomainFiles();
 
   for (const file of allFiles) {
+    if (excludedFiles.has(file)) {
+      continue;
+    }
+
     const filePath = path.join(DOMAINS_DIR, file);
     try {
       const data = JSON.parse(fs.readFileSync(filePath, "utf-8"));
@@ -700,12 +716,16 @@ function validatePRAuthor(filename, data) {
 // ============================================================
 function main() {
   const files = getChangedFiles();
-  if (files.length === 0) {
+  const deletedFiles = getDeletedFiles();
+
+  if (files.length === 0 && deletedFiles.length === 0) {
     console.log("No domain files to validate.");
     process.exit(0);
   }
 
-  const ownershipMap = buildOwnershipMap();
+  const ownershipMap = buildOwnershipMap(
+    new Set(deletedFiles.map((file) => path.basename(file)))
+  );
   let hasErrors = false;
 
   for (const file of files) {
@@ -758,6 +778,30 @@ function main() {
     console.log(`  ✓ Valid`);
   }
 
+  for (const file of deletedFiles) {
+    const filePath = path.resolve(__dirname, "..", file);
+    console.log(`\nValidating deleted file ownership: ${file}`);
+
+    let data;
+    try {
+      const raw = fs.readFileSync(filePath, "utf-8");
+      data = JSON.parse(raw);
+    } catch (e) {
+      hasErrors = true;
+      console.error(`  ✗ Failed to read deleted file metadata: ${e.message}`);
+      continue;
+    }
+
+    const prErrors = validatePRAuthor(file, data);
+    if (prErrors.length > 0) {
+      hasErrors = true;
+      prErrors.forEach((e) => console.error(`  ✗ ${e}`));
+      continue;
+    }
+
+    console.log("  ✓ Deleted file ownership matches PR author");
+  }
+
   if (hasErrors) {
     console.error("\nValidation failed. Please fix the errors above.");
     process.exit(1);
@@ -775,6 +819,9 @@ module.exports = {
   validateDomainData,
   validateOwnershipLimit,
   validatePRAuthor,
+  parseEnvFiles,
+  getChangedFiles,
+  getDeletedFiles,
   isPrivateIPv4,
   RESERVED,
   ALLOWED_RECORD_TYPES,

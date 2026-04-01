@@ -9,8 +9,10 @@ const CF_API_TOKEN = process.env.CF_API_TOKEN;
 const CF_ZONE_ID = process.env.CF_ZONE_ID;
 const BASE_DOMAIN = "is-a.net";
 
-// Subdomains managed outside domain JSON files (infrastructure, manual Cloudflare records)
-// These are NEVER deleted by orphaned record cleanup
+// Subdomains explicitly managed outside domain JSON files (infrastructure, manual Cloudflare records)
+// These are NEVER deleted by orphaned record cleanup.
+// Note: underscore-prefixed subdomains (_dmarc, _acme-challenge, _domainkey, etc.) are also
+// always skipped via pattern check below — no need to list them here.
 const PROTECTED_SUBDOMAINS = new Set([
   "this",    // Landing page (CNAME → is-a-net.github.io)
   "www",     // Potential www redirect
@@ -19,7 +21,28 @@ const PROTECTED_SUBDOMAINS = new Set([
   "smtp",    // Mail infrastructure
   "imap",    // Mail infrastructure
   "pop",     // Mail infrastructure
-  "_dmarc",  // DMARC record
+]);
+
+// Reserved names mirrored from validate.js — cannot be registered as user subdomains,
+// so any DNS records for these are infrastructure records we must never delete.
+const RESERVED_SUBDOMAINS = new Set([
+  "www", "mail", "email", "webmail", "smtp", "imap", "pop", "pop3",
+  "ftp", "sftp", "ssh", "ns", "ns1", "ns2", "ns3", "ns4", "dns", "dns1", "dns2",
+  "api", "api1", "api2", "graphql", "rest", "admin", "dashboard", "panel",
+  "cpanel", "whm", "status", "health", "monitor", "uptime",
+  "cdn", "assets", "static", "media", "img", "images", "js", "css", "fonts",
+  "files", "download", "downloads", "upload", "uploads",
+  "blog", "docs", "doc", "wiki", "help", "support", "forum", "community",
+  "app", "web", "portal", "home", "landing", "about", "news", "store", "shop",
+  "auth", "oauth", "login", "signin", "signup", "register", "account", "accounts",
+  "profile", "user", "users", "my",
+  "schema", "test", "testing", "dev", "development", "staging", "stage",
+  "prod", "production", "demo", "sandbox", "preview", "beta", "alpha", "canary",
+  "internal", "private", "local", "localhost",
+  "root", "administrator", "moderator", "mod", "owner", "system", "sysadmin",
+  "security", "abuse", "postmaster", "hostmaster", "webmaster", "info",
+  "noreply", "no-reply", "null", "undefined", "example",
+  "is-a", "isa", "tatsu", "this",
 ]);
 
 if (!CF_API_TOKEN || !CF_ZONE_ID) {
@@ -94,99 +117,132 @@ async function deployDomain(filename) {
 
   console.log(`\nDeploying: ${name}.${BASE_DOMAIN}`);
 
-  // Get existing records for this subdomain
+  // Snapshot existing records before touching anything
   const existing = await listExistingRecords(name);
 
-  // Delete existing records to avoid conflicts
+  // Phase 1: Create all new records first, collecting IDs for rollback on failure
+  const createdIds = [];
+  try {
+    if (records.A) {
+      for (const ip of records.A) {
+        const res = await createRecord(name, "A", ip, proxied);
+        createdIds.push(res.result.id);
+      }
+    }
+
+    if (records.AAAA) {
+      for (const ip of records.AAAA) {
+        const res = await createRecord(name, "AAAA", ip, proxied);
+        createdIds.push(res.result.id);
+      }
+    }
+
+    if (records.CNAME) {
+      const res = await createRecord(name, "CNAME", records.CNAME, proxied);
+      createdIds.push(res.result.id);
+    }
+
+    if (records.MX) {
+      for (const entry of records.MX) {
+        const target = typeof entry === "string" ? entry : entry.target;
+        const priority = typeof entry === "object" ? (entry.priority || 10) : 10;
+        const res = await createRecord(name, "MX", target, false, priority);
+        createdIds.push(res.result.id);
+      }
+    }
+
+    if (records.TXT) {
+      const txtEntries = Array.isArray(records.TXT) ? records.TXT : [records.TXT];
+      for (const txt of txtEntries) {
+        const res = await createRecord(name, "TXT", txt);
+        createdIds.push(res.result.id);
+      }
+    }
+
+    if (records.NS) {
+      for (const ns of records.NS) {
+        const res = await createRecord(name, "NS", ns);
+        createdIds.push(res.result.id);
+      }
+    }
+
+    if (records.CAA) {
+      for (const entry of records.CAA) {
+        const res = await createRecordWithData(name, "CAA", {
+          flags: entry.flags || 0,
+          tag: entry.tag,
+          value: entry.value,
+        });
+        createdIds.push(res.result.id);
+      }
+    }
+
+    if (records.DS) {
+      for (const entry of records.DS) {
+        const res = await createRecordWithData(name, "DS", {
+          key_tag: entry.key_tag,
+          algorithm: entry.algorithm,
+          digest_type: entry.digest_type,
+          digest: entry.digest,
+        });
+        createdIds.push(res.result.id);
+      }
+    }
+
+    if (records.SRV) {
+      for (const entry of records.SRV) {
+        const res = await createRecordWithData(name, "SRV", {
+          priority: entry.priority,
+          weight: entry.weight,
+          port: entry.port,
+          target: entry.target,
+        });
+        createdIds.push(res.result.id);
+      }
+    }
+
+    if (records.TLSA) {
+      for (const entry of records.TLSA) {
+        const res = await createRecordWithData(name, "TLSA", {
+          usage: entry.usage,
+          selector: entry.selector,
+          matching_type: entry.matching_type,
+          certificate: entry.certificate,
+        });
+        createdIds.push(res.result.id);
+      }
+    }
+
+    if (records.URL) {
+      const res = await createRecord(name, "A", "192.0.2.1", true);
+      createdIds.push(res.result.id);
+      console.log(`  ⚠ URL redirect requires Cloudflare Page Rule to be configured separately`);
+    }
+  } catch (err) {
+    // Creation failed — rollback newly created records, leaving old ones intact
+    console.error(`  ✗ Creation failed for ${name}.${BASE_DOMAIN}: ${err.message}`);
+    if (createdIds.length > 0) {
+      console.log(`  Rolling back ${createdIds.length} newly created record(s)...`);
+      for (const id of createdIds) {
+        try {
+          await deleteRecord(id);
+        } catch (rollbackErr) {
+          console.error(`  ✗ Rollback failed for record ${id}: ${rollbackErr.message}`);
+        }
+      }
+    }
+    console.log(`  Old records left intact for ${name}.${BASE_DOMAIN}`);
+    throw err;
+  }
+
+  // Phase 2: All creations succeeded — safe to remove old records now
   for (const record of existing) {
     console.log(`  Deleting old ${record.type} record (${record.id})`);
-    await deleteRecord(record.id);
-  }
-
-  // Create new records
-  if (records.A) {
-    for (const ip of records.A) {
-      await createRecord(name, "A", ip, proxied);
+    try {
+      await deleteRecord(record.id);
+    } catch (err) {
+      console.error(`  Warning: Failed to delete old record ${record.id}: ${err.message}`);
     }
-  }
-
-  if (records.AAAA) {
-    for (const ip of records.AAAA) {
-      await createRecord(name, "AAAA", ip, proxied);
-    }
-  }
-
-  if (records.CNAME) {
-    await createRecord(name, "CNAME", records.CNAME, proxied);
-  }
-
-  if (records.MX) {
-    for (const entry of records.MX) {
-      const target = typeof entry === "string" ? entry : entry.target;
-      const priority = typeof entry === "object" ? (entry.priority || 10) : 10;
-      await createRecord(name, "MX", target, false, priority);
-    }
-  }
-
-  if (records.TXT) {
-    const txtEntries = Array.isArray(records.TXT) ? records.TXT : [records.TXT];
-    for (const txt of txtEntries) {
-      await createRecord(name, "TXT", txt);
-    }
-  }
-
-  if (records.NS) {
-    for (const ns of records.NS) {
-      await createRecord(name, "NS", ns);
-    }
-  }
-
-  if (records.CAA) {
-    for (const entry of records.CAA) {
-      await createRecordWithData(name, "CAA", {
-        flags: entry.flags || 0,
-        tag: entry.tag,
-        value: entry.value,
-      });
-    }
-  }
-
-  if (records.DS) {
-    for (const entry of records.DS) {
-      await createRecordWithData(name, "DS", {
-        key_tag: entry.key_tag,
-        algorithm: entry.algorithm,
-        digest_type: entry.digest_type,
-        digest: entry.digest,
-      });
-    }
-  }
-
-  if (records.SRV) {
-    for (const entry of records.SRV) {
-      await createRecordWithData(name, "SRV", {
-        priority: entry.priority,
-        weight: entry.weight,
-        port: entry.port,
-        target: entry.target,
-      });
-    }
-  }
-
-  if (records.TLSA) {
-    for (const entry of records.TLSA) {
-      await createRecordWithData(name, "TLSA", {
-        usage: entry.usage,
-        selector: entry.selector,
-        matching_type: entry.matching_type,
-        certificate: entry.certificate,
-      });
-    }
-  }
-
-  if (records.URL) {
-    await createRecord(name, "A", "192.0.2.1", true);
-    console.log(`  ⚠ URL redirect requires Cloudflare Page Rule to be configured separately`);
   }
 
   console.log(`  ✓ Deployed successfully`);
@@ -232,8 +288,12 @@ async function main() {
       const subdomain = fqdn.replace(`.${BASE_DOMAIN}`, "");
       // Skip root domain records and multi-level subdomains
       if (!subdomain || subdomain.includes(".")) return false;
-      // Never delete protected infrastructure subdomains
-      if (PROTECTED_SUBDOMAINS.has(subdomain.toLowerCase())) return false;
+      const lower = subdomain.toLowerCase();
+      // Always skip underscore-prefixed subdomains (_dmarc, _acme-challenge, _domainkey, etc.)
+      if (lower.startsWith("_")) return false;
+      // Never delete reserved or explicitly protected infrastructure subdomains
+      if (RESERVED_SUBDOMAINS.has(lower)) return false;
+      if (PROTECTED_SUBDOMAINS.has(lower)) return false;
       return !existingSubdomains.has(subdomain);
     });
 

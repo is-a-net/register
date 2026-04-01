@@ -28,18 +28,30 @@ jobs:
               .filter(f => f.filename.startsWith('domains/') && f.filename.endsWith('.json') && !f.filename.endsWith('schema.json'))
               .filter(f => f.status !== 'removed')
               .map(f => f.filename);
+            const deletedDomainFiles = files
+              .filter(f => f.filename.startsWith('domains/') && f.filename.endsWith('.json') && !f.filename.endsWith('schema.json'))
+              .filter(f => f.status === 'removed')
+              .map(f => f.filename);
             console.log(`Changed domain files: ${domainFiles.join(', ') || '(none)'}`);
-            core.setOutput('all_changed_files', domainFiles.join(' '));
+            console.log(`Deleted domain files: ${deletedDomainFiles.join(', ') || '(none)'}`);
+            core.setOutput('all_changed_files', domainFiles.join('\n'));
+            core.setOutput('deleted_files', deletedDomainFiles.join('\n'));
 
       - name: Checkout base (trusted code)
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.base.ref }}
 
-      - name: Fetch PR domain files only
+      - name: Fetch changed PR domain files only
+        env:
+          CHANGED_FILES: ${{ steps.changed.outputs.all_changed_files }}
         run: |
           git fetch origin pull/${{ github.event.pull_request.number }}/head:pr-head
-          git checkout pr-head -- domains/
+          printf '%s\n' "$CHANGED_FILES" | while IFS= read -r file; do
+            if [ -n "$file" ]; then
+              git checkout pr-head -- "$file"
+            fi
+          done
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -53,6 +65,7 @@ jobs:
         id: validate
         env:
           CHANGED_FILES: ${{ steps.changed.outputs.all_changed_files }}
+          DELETED_FILES: ${{ steps.changed.outputs.deleted_files }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
           set +e

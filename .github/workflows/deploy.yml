@@ -6,6 +6,10 @@ on:
     paths:
       - "domains/**"
 
+concurrency:
+  group: deploy-dns
+  cancel-in-progress: false
+
 jobs:
   deploy:
     name: Deploy to Cloudflare DNS

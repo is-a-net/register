@@ -1,4 +1,11 @@
-const { isPrivateIPv4, RESERVED, ALLOWED_RECORD_TYPES } = require('../validate');
+const {
+  isPrivateIPv4,
+  RESERVED,
+  ALLOWED_RECORD_TYPES,
+  parseEnvFiles,
+  getChangedFiles,
+  getDeletedFiles,
+} = require('../validate');
 
 // ============================================================
 // isPrivateIPv4
@@ -110,5 +117,44 @@ describe('ALLOWED_RECORD_TYPES', () => {
     test.each(['SPF', 'PTR', 'SOA', 'NAPTR'])('does not include "%s"', (type) => {
       expect(ALLOWED_RECORD_TYPES).not.toContain(type);
     });
+  });
+});
+
+describe('changed/deleted file env parsing', () => {
+  const originalChangedFiles = process.env.CHANGED_FILES;
+  const originalDeletedFiles = process.env.DELETED_FILES;
+
+  afterEach(() => {
+    if (originalChangedFiles === undefined) {
+      delete process.env.CHANGED_FILES;
+    } else {
+      process.env.CHANGED_FILES = originalChangedFiles;
+    }
+
+    if (originalDeletedFiles === undefined) {
+      delete process.env.DELETED_FILES;
+    } else {
+      process.env.DELETED_FILES = originalDeletedFiles;
+    }
+  });
+
+  test('parseEnvFiles accepts newline-delimited workflow output', () => {
+    expect(parseEnvFiles('domains/a.json\ndomains/b.json')).toEqual([
+      'domains/a.json',
+      'domains/b.json',
+    ]);
+  });
+
+  test('getChangedFiles respects empty CHANGED_FILES for delete-only PRs', () => {
+    process.env.CHANGED_FILES = '';
+    expect(getChangedFiles()).toEqual([]);
+  });
+
+  test('getDeletedFiles returns removed domain files from env', () => {
+    process.env.DELETED_FILES = 'domains/old.json\ndomains/legacy.json';
+    expect(getDeletedFiles()).toEqual([
+      'domains/old.json',
+      'domains/legacy.json',
+    ]);
   });
 });

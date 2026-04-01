@@ -18,6 +18,7 @@ function main() {
 
   const domains = [];
   const domainNames = [];
+  let parseErrors = 0;
 
   for (const file of files) {
     const filePath = path.join(DOMAINS_DIR, file);
@@ -38,7 +39,13 @@ function main() {
       domainNames.push(subdomain);
     } catch (e) {
       console.warn(`Warning: Failed to parse ${file}: ${e.message}`);
+      parseErrors += 1;
     }
+  }
+
+  if (parseErrors > 0) {
+    console.error(`Aborting API generation: ${parseErrors} domain file(s) failed to parse.`);
+    process.exit(1);
   }
 
   const now = new Date().toISOString();
