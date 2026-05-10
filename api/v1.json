@@ -1,18 +1,7 @@
 {
-  "generated_at": "2026-04-04T07:17:37.553Z",
-  "total_domains": 2,
+  "generated_at": "2026-05-10T04:00:10.361Z",
+  "total_domains": 1,
   "domains": [
-    {
-      "domain": "rk0exn.is-a.net",
-      "subdomain": "rk0exn",
-      "owner": {
-        "username": "rk0exn"
-      },
-      "records": {
-        "TXT": "chprks!!!"
-      },
-      "proxied": false
-    },
     {
       "domain": "tatsut.is-a.net",
       "subdomain": "tatsut",
